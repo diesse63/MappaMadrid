@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mappa Madrid</title>
+<style>
+  html, body { height: 100%; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+  #map { height: 100%; width: 100%; }
+  .info-window a { display: block; margin-top: 5px; color: blue; text-decoration: underline; }
+  .legend {
+    background: rgba(255,255,255,0.9);
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    margin-top: 5px;
+  }
+  .legend div { margin-bottom: 5px; display: flex; align-items: center; }
+  .legend span { display: inline-block; width: 15px; height: 15px; margin-right: 5px; border: 1px solid black; }
+  .center-button {
+    background: white;
+    border: 1px solid #888;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    margin-bottom: 5px;
+  }
+</style>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCnjphUot626of1dBSAzgGk3Mk30QyppDg"></script>
+</head>
+<body>
+<div id="map"></div>
+
+<script>
+const tipi = {
+  "1": { nome: "Albergo", colore: "red" },
+  "2": { nome: "Mercato", colore: "green" },
+  "3": { nome: "Museo", colore: "blue" },
+  "4": { nome: "Cattedrale", colore: "orange" },
+  "5": { nome: "Parco", colore: "purple" },
+  "6": { nome: "Quartiere", colore: "yellow" },
+  "7": { nome: "Bagagli", colore: "cyan" },
+  "8": { nome: "Monumento", colore: "magenta" }
+};
+
+function creaLinkGoogleMaps(lat, lng) {
+  return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+}
+
+function initMap() {
+  const map = new google.maps.Map(document.getElementById("map"), {
+    zoom: 13,
+    center: { lat: 40.4168, lng: -3.7038 }
+  });
+
+  const infoWindow = new google.maps.InfoWindow();
+
+  // Bottone "Centra sulla posizione"
+  const centerButton = document.createElement("div");
+  centerButton.className = "center-button";
+  centerButton.textContent = "Centra sulla posizione";
+  centerButton.addEventListener("click", () => {
+    if (window.currentLocationMarker) {
+      map.setCenter(window.currentLocationMarker.getPosition());
+      map.setZoom(15);
+    }
+  });
+  map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(centerButton);
+
+  // Legenda sotto al bottone
+  const legend = document.createElement("div");
+  legend.className = "legend";
+  for (const id in tipi) {
+    const item = document.createElement("div");
+    item.innerHTML = `<span style="background:${tipi[id].colore}"></span>${tipi[id].nome}`;
+    legend.appendChild(item);
+  }
+  map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(legend);
+
+  // Caricamento dati dal Google Sheet
+  const spreadsheetId = "1c2BLYPg8p-ZxdIqtbxnsctfyNeQWjcDf8Tm6Y6r4QEU";
+  const range = "Madrid!A2:H";
+  const apiKey = "AIzaSyCnjphUot626of1dBSAzgGk3Mk30QyppDg";
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?key=${apiKey}`;
+
+  fetch(url)
+    .then(response => response.json())
+    .then(data => {
+      const rows = data.values;
+      if (!rows) return;
+
+      rows.forEach(row => {
+        const [IDLuoghi, Name, Coordinate, Link, Note, , IDTipo] = row;
+        if (!Coordinate) return;
+        const [lat, lng] = Coordinate.split(",").map(Number);
+        const colore = (tipi[IDTipo] && tipi[IDTipo].colore) || "gray";
+
+        const marker = new google.maps.Marker({
+          position: {lat, lng},
+          map: map,
+          title: Name,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 7,
+            fillColor: colore,
+            fillOpacity: 0.9,
+            strokeWeight: 1,
+            strokeColor: "black"
+          }
+        });
+
+        marker.addListener("click", () => {
+          const googleMapsLink = creaLinkGoogleMaps(lat, lng);
+          infoWindow.setContent(`
+            <div class="info-window">
+              <h3>${Name}</h3>
+              <p><strong>Note:</strong> ${Note || "Nessuna"}</p>
+              <a href="${Link}" target="_blank">Link info</a>
+              <a href="${googleMapsLink}" target="_blank">Apri in Google Maps</a>
+            </div>
+          `);
+          infoWindow.open(map, marker);
+        });
+      });
+    })
+    .catch(err => console.error("Errore caricamento dati:", err));
+
+  // Forza richiesta posizione all'apertura
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(position => {
+      const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+
+      // Marker blu posizione attuale
+      window.currentLocationMarker = new google.maps.Marker({
+        position: pos,
+        map: map,
+        title: "Posizione attuale",
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 7,
+          fillColor: "blue",
+          fillOpacity: 0.9,
+          strokeWeight: 1,
+          strokeColor: "black"
+        }
+      });
+
+      // Cerchio intorno alla posizione
+      window.currentLocationCircle = new google.maps.Circle({
+        strokeColor: '#0000FF',
+        strokeOpacity: 0.5,
+        strokeWeight: 1,
+        fillColor: '#0000FF',
+        fillOpacity: 0.2,
+        map: map,
+        center: pos,
+        radius: 20
+      });
+
+      map.setCenter(pos);
+      map.setZoom(15);
+    }, error => {
+      console.error("Errore geolocalizzazione:", error);
+      alert("Errore nella geolocalizzazione. Controlla permessi e HTTPS.");
+    }, { enableHighAccuracy: true });
+  }
+}
+
+window.onload = initMap;
+</script>
+</body>
+</html>
