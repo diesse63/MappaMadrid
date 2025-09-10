@@ -18,7 +18,7 @@
   }
   .legend div { margin-bottom: 5px; display: flex; align-items: center; }
   .legend span { display: inline-block; width: 15px; height: 15px; margin-right: 5px; border: 1px solid black; }
-  .center-button {
+  .center-button, .add-poi-button {
     background: white;
     border: 1px solid #888;
     border-radius: 4px;
@@ -57,6 +57,7 @@ function initMap() {
   });
 
   const infoWindow = new google.maps.InfoWindow();
+  let selezionePOI = false;
 
   // Bottone "Centra sulla posizione"
   const centerButton = document.createElement("div");
@@ -69,6 +70,16 @@ function initMap() {
     }
   });
   map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(centerButton);
+
+  // Bottone "Aggiungi nuovo POI"
+  const addPOIButton = document.createElement("div");
+  addPOIButton.className = "add-poi-button";
+  addPOIButton.textContent = "Aggiungi nuovo POI";
+  addPOIButton.addEventListener("click", () => {
+    selezionePOI = true;
+    alert("Clicca sulla mappa per selezionare la posizione del nuovo POI");
+  });
+  map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(addPOIButton);
 
   // Legenda sotto al bottone
   const legend = document.createElement("div");
@@ -128,8 +139,10 @@ function initMap() {
     })
     .catch(err => console.error("Errore caricamento dati:", err));
 
-  // Long press (click destro) per aggiungere un nuovo POI
-  map.addListener("rightclick", (e) => {
+  // Selezione posizione per nuovo POI
+  map.addListener("click", (e) => {
+    if (!selezionePOI) return;
+    selezionePOI = false;
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
 
@@ -149,7 +162,6 @@ function initMap() {
     navigator.geolocation.getCurrentPosition(position => {
       const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
 
-      // Marker blu posizione attuale
       window.currentLocationMarker = new google.maps.Marker({
         position: pos,
         map: map,
@@ -164,7 +176,6 @@ function initMap() {
         }
       });
 
-      // Cerchio intorno alla posizione
       window.currentLocationCircle = new google.maps.Circle({
         strokeColor: '#0000FF',
         strokeOpacity: 0.5,
