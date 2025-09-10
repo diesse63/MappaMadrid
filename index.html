@@ -128,7 +128,23 @@ function initMap() {
     })
     .catch(err => console.error("Errore caricamento dati:", err));
 
-  // Forza richiesta posizione all'apertura
+  // Long press (click destro) per aggiungere un nuovo POI
+  map.addListener("rightclick", (e) => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+
+    infoWindow.setContent(`
+      <div class="info-window">
+        <h3>Nuovo POI</h3>
+        <p><strong>Coordinate:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
+        <button onclick="aggiungiAlFoglio('${lat}','${lng}')">➕ Aggiungi al foglio</button>
+      </div>
+    `);
+    infoWindow.setPosition(e.latLng);
+    infoWindow.open(map);
+  });
+
+  // Geolocalizzazione
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(position => {
       const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
@@ -167,6 +183,24 @@ function initMap() {
       alert("Errore nella geolocalizzazione. Controlla permessi e HTTPS.");
     }, { enableHighAccuracy: true });
   }
+}
+
+// --- Funzione per inviare al Web App lo script Google ---
+function aggiungiAlFoglio(lat, lng) {
+  const name = prompt("Inserisci il nome del luogo:", "Nuovo POI");
+  if (!name) return;
+
+  const url = "https://script.google.com/macros/s/AKfycbzkyPJ22iHiVrWM3MUHK5ZTjF45Gp1Yr2A2hkrPDqmf3woroML1MyI7IwfUvYWsl7yR/exec";
+
+  fetch(`${url}?action=add&name=${encodeURIComponent(name)}&lat=${lat}&lng=${lng}`)
+    .then(res => res.text())
+    .then(msg => {
+      alert("✅ " + msg);
+    })
+    .catch(err => {
+      console.error("Errore invio:", err);
+      alert("❌ Errore durante l'aggiunta");
+    });
 }
 
 window.onload = initMap;
